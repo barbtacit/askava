@@ -9,7 +9,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing prompt in request body" });
   }
 
-  // Log the request payload before sending to Alltius
+  console.log("📤 Using API Key (first 10 chars):", process.env.ALLTIUS_API_KEY?.slice(0, 10) + "********");
+
   const requestBody = {
     assistant_id: process.env.ALLTIUS_ASSISTANT_ID,
     user_id: "test_user",
@@ -28,20 +29,22 @@ export default async function handler(req, res) {
       body: JSON.stringify(requestBody),
     });
 
-    if (!response.ok) {
-      const errorDetails = await response.text();
-      console.error("❌ Alltius API Error:", response.status, response.statusText, errorDetails);
-      return res.status(response.status).json({ error: `API Error: ${response.status} - ${response.statusText}`, details: errorDetails });
+    const responseText = await response.text();
+    console.log("📥 Full Alltius API Raw Response:", responseText); // ✅ Debug Log
+
+    // Try to parse JSON response
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error("❌ Failed to parse Alltius response as JSON:", error);
+      return res.status(500).json({ error: "Invalid JSON response from Alltius", details: responseText });
     }
 
-    // Parse response as JSON
-    const data = await response.json();
-    console.log("📥 Full Alltius API Response:", JSON.stringify(data, null, 2)); // ✅ Debug Log
+    console.log("📥 Full Alltius API Parsed Response:", JSON.stringify(data, null, 2));
 
-    // Extract AI response
     let aiResponse = data.output || data.response || data.message || "No valid AI response received";
 
-    // If response is missing, log it and return error
     if (!aiResponse || aiResponse === "No valid AI response received") {
       console.error("❌ Unexpected API response format:", JSON.stringify(data, null, 2));
       return res.status(500).json({ error: "Unexpected response format", details: data });
