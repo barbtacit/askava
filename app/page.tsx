@@ -33,7 +33,7 @@ export default function Home() {
     const responses = {};
     for (const [index, element] of parsedElements.entries()) {
       try {
-        console.log(`Sending to Alltius: ${element}`); // Debug Log
+        console.log(`📤 Sending to Alltius: ${element}`); // Debug Log
         const aiResponse = await fetch("/api/alltius-generate-response", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -41,27 +41,30 @@ export default function Home() {
         });
   
         const aiData = await aiResponse.json();
-        console.log(`AI Response for: ${element} → ${aiData.response}`); // Debug Log
+        console.log(`📥 AI Response for: ${element} →`, aiData.response); // Debug Log
+  
         responses[index] = aiData.response || "AI response failed.";
       } catch (error) {
-        console.error("AI Response Error:", error);
+        console.error("❌ AI Response Error:", error);
         responses[index] = "AI response failed.";
       }
     }
   
-    // Set responses from Alltius, overriding Airtable responses
-    setResponses(responses);
+    // Set responses from Alltius, ensuring proper state updates
+    setResponses((prev) => ({ ...prev, ...responses }));
   };  
-  
+
   return (
     <div className="min-h-screen p-10 bg-gray-100">
       <h1 className="text-2xl font-bold mb-4">EPI - RFP Processing</h1>
+      
       <button
-  className="bg-green-600 text-white px-4 py-2 rounded mb-4"
-  onClick={() => window.open("https://airtable.com/appO645FMzwrtH9G6/pagAJu6rvcXRfL9as/form", "_blank")}
->
-  Submit RFP
-</button>
+        className="bg-green-600 text-white px-4 py-2 rounded mb-4"
+        onClick={() => window.open("https://airtable.com/appO645FMzwrtH9G6/pagAJu6rvcXRfL9as/form", "_blank")}
+      >
+        Submit RFP
+      </button>
+
       <textarea
         className="w-full p-3 border rounded mb-4"
         rows="5"
@@ -95,7 +98,7 @@ export default function Home() {
                 type="text"
                 className="w-full p-2 border rounded"
                 placeholder={`Response for: ${item}`}
-                value={responses[index]}
+                value={responses[index] ?? ""}
                 onChange={(e) => setResponses(prev => ({ ...prev, [index]: e.target.value }))}
               />
             </div>
@@ -104,4 +107,4 @@ export default function Home() {
       </div>
     </div>
   );
-
+}
