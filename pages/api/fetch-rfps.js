@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       created_at: record.get("created_at"),
     }));
 
+    console.log("Fetched Data from Airtable:", data);
     res.status(200).json(data);
   } catch (error) {
     console.error("Airtable Fetch Error:", error);
