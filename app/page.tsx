@@ -1,65 +1,55 @@
 "use client";
 import { useState } from "react";
-// import { fetchRFPs } from "@/lib/airtable"; // Removed unused import
+import { fetchRFPs } from "@/lib/airtable"; // ✅ Import Airtable function
 
 export default function Home() {
-  const [rfpText, setRfpText] = useState(""); // Unused in current fetch logic
+  const [rfpText, setRfpText] = useState("");
   const [elements, setElements] = useState([]);
-  const [responses, setResponses] = useState({}); // Initialize as empty object
+  const [responses, setResponses] = useState({});
   const [latestRFP, setLatestRFP] = useState(null);
-  const [errorMessage, setErrorMessage] = useState(""); // State for error messages
 
   const handleSubmit = async () => {
     console.log("Fetching the latest RFP from Airtable...");
-    setErrorMessage(""); // Clear any previous errors
 
     // Fetch RFPs from Airtable API
     const response = await fetch("/api/fetch-rfps");
-
-    if (!response.ok) {
-      console.error("HTTP error fetching RFPs:", response.status, response.statusText);
-      setErrorMessage(`Failed to fetch RFPs. Status: ${response.status} ${response.statusText}`);
-      return;
-    }
-
     const data = await response.json();
 
     if (!data || data.length === 0) {
-      setErrorMessage("No RFPs found! Please add one first.");
+      alert("No RFPs found! Please add one first.");
       return;
     }
 
-    const latestFetchedRFP = data[data.length - 1];
-    setLatestRFP(latestFetchedRFP);
+    const latestFetchedRFP = data[data.length - 1]; // ✅ Get the most recent RFP
+    setLatestRFP(latestFetchedRFP); // ✅ Store in state
 
     if (!latestFetchedRFP || !latestFetchedRFP.rfp_text) {
-      setErrorMessage("The latest RFP is missing text data.");
+      alert("The latest RFP is missing text data.");
       return;
     }
 
     const parsedElements = latestFetchedRFP.rfp_text.split("\n").filter(line => line.trim() !== "");
     setElements(parsedElements);
 
-    // Initialize responses as empty strings for each element
-    const initialResponses = {};
-    parsedElements.forEach((_, index) => {
-      initialResponses[index] = ""; // Initialize with empty string
+    // ✅ Get responses directly from Airtable
+    const newResponses = {};
+    parsedElements.forEach((element, index) => {
+      const storedResponse = latestFetchedRFP.response || "No response available"; // Pull from Airtable response field
+      newResponses[index] = storedResponse;
     });
-    setResponses(initialResponses);
 
-    console.log("📥 Airtable RFP and initialized empty responses.");
+    console.log("📥 Airtable Responses:", newResponses);
+    setResponses(newResponses);
   };
 
   const handleSaveResponse = async (index) => {
     if (!latestRFP) {
       console.error("❌ Error: No latestRFP found.");
-      setErrorMessage("No RFP loaded to save responses.");
       return;
     }
-    setErrorMessage(""); // Clear any previous errors
 
     const responseText = responses[index] ?? "";
-    const rfpId = latestRFP.id;
+    const rfpId = latestRFP.id; // ✅ Use state-stored latestRFP
 
     console.log(`💾 Saving response for ${elements[index]}:`, responseText);
 
@@ -73,33 +63,21 @@ export default function Home() {
         body: JSON.stringify(updateData),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json(); // Try to get error details from the server
-        const message = errorData?.error || `Failed to save response. Status: ${res.status} ${res.statusText}`;
-        console.error("❌ Failed to save response:", message);
-        setErrorMessage(message);
-        return;
-      }
-
       const data = await res.json();
       console.log("✅ API Response:", data);
-      setErrorMessage("Response saved successfully!"); // Success message
     } catch (error) {
       console.error("❌ Failed to save response:", error);
-      setErrorMessage("Failed to save response. Please check the console for details.");
     }
   };
 
   const handleApproveResponse = async (index) => {
     if (!latestRFP) {
       console.error("❌ Error: No latestRFP found.");
-      setErrorMessage("No RFP loaded to approve responses.");
       return;
     }
-    setErrorMessage(""); // Clear any previous errors
 
     const responseText = responses[index] ?? "";
-    const rfpId = latestRFP.id;
+    const rfpId = latestRFP.id; // ✅ Use state-stored latestRFP
 
     console.log(`✅ Approving response for ${elements[index]}:`, responseText);
 
@@ -112,20 +90,10 @@ export default function Home() {
         body: JSON.stringify(updateData),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        const message = errorData?.error || `Failed to approve response. Status: ${res.status} ${res.statusText}`;
-        console.error("❌ Failed to approve response:", message);
-        setErrorMessage(message);
-        return;
-      }
-
       const data = await res.json();
       console.log("🎉 Response approved:", data);
-      setErrorMessage("Response approved successfully!"); // Success message
     } catch (error) {
       console.error("❌ Failed to approve response:", error);
-      setErrorMessage("Failed to approve response. Please check the console for details.");
     }
   };
 
@@ -152,10 +120,8 @@ export default function Home() {
         className="bg-blue-600 text-white px-4 py-2 rounded"
         onClick={handleSubmit}
       >
-        Load Latest RFP {/* Changed button label for clarity */}
+        Process RFP
       </button>
-
-      {errorMessage && <p className="text-red-500 mt-2">{errorMessage}</p>} {/* Display error message */}
 
       <div className="grid grid-cols-2 gap-6 mt-6">
         <div className="bg-white p-4 shadow rounded">
