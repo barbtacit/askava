@@ -1,25 +1,31 @@
+import { NextResponse } from 'next/server';
 import { globalFetch } from "@/utils/globalFetch";
 
-export default async function handler(req, res) {
+export async function GET() {
   if (!process.env.AIRTABLE_API_KEY || !process.env.AIRTABLE_BASE_ID || !process.env.AIRTABLE_TABLE_NAME) {
-    console.error("❌ Missing required Airtable API credentials. Check your .env.local file.");
-    return res.status(500).json({ error: "Missing Airtable API Key, Base ID, or Table Name." });
+    console.error("❌ Missing required Airtable API credentials.");
+    return NextResponse.json(
+      { error: "Missing Airtable API Key, Base ID, or Table Name." },
+      { status: 500 }
+    );
   }
 
   try {
     console.log("📡 Fetching RFPs from Airtable...");
 
     const airtableURL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME}`;
-    const data = await globalFetch(airtableURL, "GET", null, {
-      Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
+    const data = await globalFetch(airtableURL, {
+      headers: {
+        Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
+      },
     });
 
-    if (!data.records || data.records.length === 0) {
+    if (!data.success || !data.data?.records?.length) {
       console.warn("⚠️ No RFP records found in Airtable.");
-      return res.status(200).json({ message: "No RFPs available." });
+      return NextResponse.json({ message: "No RFPs available." });
     }
 
-    const formattedData = data.records.map((record) => ({
+    const formattedData = data.data.records.map((record) => ({
       id: record.id,
       rfp_title: record.fields.rfp_title || "No Title",
       requesting_company: record.fields.requesting_company || "Unknown Company",
@@ -30,9 +36,12 @@ export default async function handler(req, res) {
     }));
 
     console.log("✅ Successfully fetched", formattedData.length, "RFPs from Airtable.");
-    res.status(200).json(formattedData);
+    return NextResponse.json(formattedData);
   } catch (error) {
     console.error("❌ Airtable Fetch Error:", error);
-    res.status(500).json({ error: "Failed to fetch data from Airtable", details: error.message });
+    return NextResponse.json(
+      { error: "Failed to fetch data from Airtable", details: error.message },
+      { status: 500 }
+    );
   }
 }
