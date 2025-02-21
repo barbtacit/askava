@@ -4,10 +4,9 @@ import { API_ENDPOINTS } from "@/constants/api";
 import { RFP, ResponseStatus } from "@/types";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useNotification } from "@/contexts/NotificationContext";
-import { parseRFPWithAI } from "@/utils/rfpParser";
 
 export default function Home() {
-  const [rfpText, setRfpText] = useState("");
+  const [rfpTitle, setRfpTitle] = useState("");
   const [elements, setElements] = useState<string[]>([]);
   const [responses, setResponses] = useState<Record<number, string>>({});
   const [latestRFP, setLatestRFP] = useState<RFP | null>(null);
@@ -16,89 +15,83 @@ export default function Home() {
   const [isParsingWithAI, setIsParsingWithAI] = useState<boolean>(false);
   const { showNotification } = useNotification();
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    
-    try {
-      // Fetch RFPs using our updated library function
-      const response = await fetch(API_ENDPOINTS.INTERNAL.FETCH_RFPS);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Error fetching RFPs: ${response.status}`);
-      }
-      
-      const data = await response.json();
-
-      if (!data || data.length === 0) {
-        showNotification('warning', 'No RFPs found! Please add one first.');
-        return;
-      }
-
-      const latestFetchedRFP = data[data.length - 1]; // Get the most recent RFP
-      setLatestRFP(latestFetchedRFP);
-
-      if (!latestFetchedRFP || !latestFetchedRFP.rfp_text) {
-        showNotification('error', 'The latest RFP is missing text data.');
-        return;
-      }
-
-      // Set the RFP text in the textarea
-      setRfpText(latestFetchedRFP.rfp_text);
-
-      const parsedElements = latestFetchedRFP.rfp_text.split("\n").filter(line => line.trim() !== "");
-      setElements(parsedElements);
-
-      // Get responses directly from Airtable
-      const newResponses: Record<number, string> = {};
-      parsedElements.forEach((element, index) => {
-        const storedResponse = latestFetchedRFP.response || "No response available";
-        newResponses[index] = storedResponse;
-      });
-
-      console.log("📥 Airtable Responses:", newResponses);
-      setResponses(newResponses);
-      showNotification('success', 'RFP loaded successfully!');
-    } catch (err) {
-      console.error("Error during RFP fetch:", err);
-      showNotification('error', `Failed to fetch RFPs: ${err.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleParseWithAI = async () => {
-    if (!rfpText.trim()) {
-      showNotification('warning', 'Please enter or load RFP text first.');
+  const handleAnalyzeRFP = async () => {
+    if (!rfpTitle.trim()) {
+      showNotification('warning', 'Please enter a question first.');
       return;
     }
 
     setIsParsingWithAI(true);
     
     try {
-      showNotification('info', 'AI is analyzing the RFP...', 8000);
+      console.log("💬 Starting API request");
+      console.log("📍 Endpoint:", API_ENDPOINTS.INTERNAL.ANALYZE_RFP);
+      console.log("📝 Question:", rfpTitle);
       
-      // Parse RFP with AI
-      const parsedRFP = await parseRFPWithAI(rfpText);
+      showNotification('info', `Sending question to Alltius...`, 8000);
       
-      if (parsedRFP.elements.length === 0) {
-        throw new Error('AI could not identify any elements in the RFP');
+      const response = await fetch(API_ENDPOINTS.INTERNAL.ANALYZE_RFP, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rfpTitle }),
+      });
+
+      console.log("📥 Response status:", response.status);
+      console.log("📥 Response headers:", Object.fromEntries(response.headers.entries()));
+
+      // Get the response text first
+      const responseText = await response.text();
+      console.log("📥 Raw response:", responseText);
+
+      // Try to parse it as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("📥 Parsed data:", data);
+      } catch (e) {
+        console.error("❌ JSON Parse Error:", e);
+        throw new Error(`Failed to parse response as JSON: ${e.message}`);
+      }
+
+      if (!response.ok) {
+        console.error("❌ Error response:", data);
+        throw new Error(data.error || `Error ${response.status}: Failed to get response from Alltius`);
       }
       
-      // Update state with parsed elements and responses
-      setElements(parsedRFP.elements);
-      setResponses(parsedRFP.responses);
+      if (!data.success || !data.elements) {
+        console.error("❌ Invalid response format:", data);
+        throw new Error('Failed to get valid response from Alltius');
+      }
+
+      console.log("✅ Successfully received elements:", data.elements);
+
+      // Update state with elements
+      setElements(data.elements);
+      
+      // Create empty responses for each element
+      const newResponses: Record<number, string> = {};
+      data.elements.forEach((_, index) => {
+        newResponses[index] = "";
+      });
+      setResponses(newResponses);
       
       showNotification(
         'success', 
-        `RFP successfully analyzed! Found ${parsedRFP.elements.length} elements.`
+        `Received response from Alltius!`
       );
       
     } catch (err) {
-      console.error("Error during AI parsing:", err);
+      console.error("🚨 Error in handleAnalyzeRFP:", err);
+      console.error("Full error details:", {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       showNotification(
         'error',
-        `AI analysis failed: ${err.message}. Try simplifying the RFP text.`
+        `Failed to get response: ${err.message}`
       );
     } finally {
       setIsParsingWithAI(false);
@@ -107,7 +100,7 @@ export default function Home() {
 
   const handleSaveResponse = async (index: number) => {
     if (!latestRFP) {
-      showNotification('error', 'No RFP loaded. Please load an RFP first.');
+      showNotification('error', 'No RFP loaded. Please analyze an RFP first.');
       return;
     }
 
@@ -115,8 +108,6 @@ export default function Home() {
     try {
       const responseText = responses[index] ?? "";
       const rfpId = latestRFP.id;
-
-      console.log(`💾 Saving response for ${elements[index]}:`, responseText);
 
       const res = await fetch(API_ENDPOINTS.INTERNAL.UPDATE_RESPONSE, {
         method: "POST",
@@ -133,11 +124,9 @@ export default function Home() {
         throw new Error(errorData.error || `HTTP error: ${res.status}`);
       }
       
-      const data = await res.json();
-      console.log("✅ API Response:", data);
       showNotification('success', 'Response saved successfully!');
     } catch (err) {
-      console.error("❌ Failed to save response:", err);
+      console.error("Failed to save response:", err);
       showNotification('error', `Failed to save response: ${err.message}`);
     } finally {
       setIsProcessing(prev => ({ ...prev, [index]: false }));
@@ -146,7 +135,7 @@ export default function Home() {
 
   const handleApproveResponse = async (index: number) => {
     if (!latestRFP) {
-      showNotification('error', 'No RFP loaded. Please load an RFP first.');
+      showNotification('error', 'No RFP loaded. Please analyze an RFP first.');
       return;
     }
 
@@ -154,8 +143,6 @@ export default function Home() {
     try {
       const responseText = responses[index] ?? "";
       const rfpId = latestRFP.id;
-
-      console.log(`✅ Approving response for ${elements[index]}:`, responseText);
 
       const res = await fetch(API_ENDPOINTS.INTERNAL.UPDATE_RESPONSE, {
         method: "POST",
@@ -172,11 +159,9 @@ export default function Home() {
         throw new Error(errorData.error || `HTTP error: ${res.status}`);
       }
       
-      const data = await res.json();
-      console.log("🎉 Response approved:", data);
       showNotification('success', 'Response approved successfully!');
     } catch (err) {
-      console.error("❌ Failed to approve response:", err);
+      console.error("Failed to approve response:", err);
       showNotification('error', `Failed to approve response: ${err.message}`);
     } finally {
       setIsProcessing(prev => ({ ...prev, [index]: false }));
@@ -187,69 +172,49 @@ export default function Home() {
     <div className="min-h-screen p-10 bg-gray-100">
       <h1 className="text-2xl font-bold mb-4">EPI - RFP Processing</h1>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <button
-          className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
-          onClick={() => window.open(API_ENDPOINTS.AIRTABLE.FORM_URL, "_blank")}
-        >
-          Submit RFP
-        </button>
-
-        <button
-          className="bg-blue-600 text-white px-4 py-2 rounded disabled:bg-gray-400 hover:bg-blue-700 transition flex items-center justify-center min-w-[120px]"
-          onClick={handleSubmit}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <LoadingSpinner size="small" color="#ffffff" />
-              <span className="ml-2">Loading...</span>
-            </>
-          ) : (
-            "Load Latest RFP"
-          )}
-        </button>
-
-        <button
-          className="bg-purple-600 text-white px-4 py-2 rounded disabled:bg-gray-400 hover:bg-purple-700 transition flex items-center justify-center min-w-[140px]"
-          onClick={handleParseWithAI}
-          disabled={isParsingWithAI || !rfpText.trim()}
-        >
-          {isParsingWithAI ? (
-            <>
-              <LoadingSpinner size="small" color="#ffffff" />
-              <span className="ml-2">Processing with AI...</span>
-            </>
-          ) : (
-            "Analyze with AI"
-          )}
-        </button>
+      <div className="mb-6 bg-white p-4 rounded shadow">
+        <h2 className="text-lg font-semibold mb-2">Analyze RFP from Google Drive</h2>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            className="flex-1 p-2 border rounded focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+            placeholder="Enter question for Alltius..."
+            value={rfpTitle}
+            onChange={(e) => setRfpTitle(e.target.value)}
+          />
+          <button
+            className="bg-purple-600 text-white px-4 py-2 rounded disabled:bg-gray-400 hover:bg-purple-700 transition flex items-center justify-center min-w-[140px]"
+            onClick={handleAnalyzeRFP}
+            disabled={isParsingWithAI || !rfpTitle.trim()}
+          >
+            {isParsingWithAI ? (
+              <>
+                <LoadingSpinner size="small" color="#ffffff" />
+                <span className="ml-2">Analyzing...</span>
+              </>
+            ) : (
+              "Analyze RFP"
+            )}
+          </button>
+        </div>
       </div>
-
-      <textarea
-        className="w-full p-3 border rounded mb-4 focus:ring-2 focus:ring-blue-300 focus:border-blue-300 transition"
-        rows={5}
-        placeholder="Paste RFP content here..."
-        value={rfpText}
-        onChange={(e) => setRfpText(e.target.value)}
-      ></textarea>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         <div className="bg-white p-4 shadow rounded">
-          <h2 className="text-xl font-semibold mb-2">RFP Elements</h2>
-          {isLoading || isParsingWithAI ? (
+          <h2 className="text-xl font-semibold mb-2">Response from Alltius</h2>
+          {isParsingWithAI ? (
             <div className="py-10">
               <LoadingSpinner size="large" />
             </div>
           ) : elements.length === 0 ? (
             <div className="text-gray-500 py-6 text-center border border-dashed rounded-md">
-              No RFP elements loaded yet. Click "Load Latest RFP" or "Analyze with AI" to process data.
+              No response yet. Enter a question and click "Analyze RFP" to get a response.
             </div>
           ) : (
             <ul className="divide-y">
               {elements.map((item, index) => (
                 <li key={index} className="py-2">
-                  <span className="font-medium text-gray-700">#{index + 1}:</span> {item}
+                  <span className="font-medium text-gray-700">Response:</span> {item}
                 </li>
               ))}
             </ul>
@@ -257,23 +222,23 @@ export default function Home() {
         </div>
 
         <div className="bg-white p-4 shadow rounded">
-          <h2 className="text-xl font-semibold mb-2">Responses</h2>
-          {isLoading || isParsingWithAI ? (
+          <h2 className="text-xl font-semibold mb-2">Your Notes</h2>
+          {isParsingWithAI ? (
             <div className="py-10">
               <LoadingSpinner size="large" />
             </div>
           ) : elements.length === 0 ? (
             <div className="text-gray-500 py-6 text-center border border-dashed rounded-md">
-              Load an RFP to view and manage responses.
+              Get a response first to add notes.
             </div>
           ) : (
             elements.map((item, index) => (
               <div key={index} className="mb-3 p-3 border rounded hover:shadow-md transition">
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Element {index + 1}</h3>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Notes for Response {index + 1}</h3>
                 
                 <textarea
                   className="w-full p-2 border rounded mb-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-300 transition min-h-[100px]"
-                  placeholder={`Response for: ${item}`}
+                  placeholder="Add your notes here..."
                   value={responses[index] ?? ""}
                   onChange={(e) => setResponses(prev => ({ ...prev, [index]: e.target.value }))}
                 />

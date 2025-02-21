@@ -15,7 +15,8 @@ export const API_ENDPOINTS = {
   INTERNAL: {
     FETCH_RFPS: '/api/fetch-rfps',
     UPDATE_RESPONSE: '/api/update-response',
-    GENERATE_RESPONSE: '/api/alltius-generate-response'
+    GENERATE_RESPONSE: '/api/alltius-generate-response',
+    ANALYZE_RFP: '/api/alltius-get-analysis'
   }
 };
 
