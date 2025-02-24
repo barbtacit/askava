@@ -1,6 +1,15 @@
 // constants/api.ts
+// constants/api.ts
 
-const VERSION_CONFIG = {
+type VersionKey = 'versionRFP' | 'versionCyber';
+
+interface VersionConfig {
+  altiusAssistantId: string;
+  airtableBaseId: string;
+  airtableTableName: string;
+}
+
+const VERSION_CONFIG: Record<VersionKey, VersionConfig> = {
   versionRFP: {
     altiusAssistantId: '67212f6bf8bc9853980a8e6b',
     airtableBaseId: 'appO645FMzwrtH9G6',
@@ -13,7 +22,7 @@ const VERSION_CONFIG = {
   }
 };
 
-export const getApiConfig = (version: string) => {
+export const getApiConfig = (version: VersionKey) => {
   const config = VERSION_CONFIG[version];
   
   return {

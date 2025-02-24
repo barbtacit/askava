@@ -1,45 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getApiConfig } from '@/constants/api';
 
-export async function POST(request: NextRequest) {
+export async function GET() {
   try {
-    const body = await request.json();
-    
-    if (!body.element || !body.response) {
-      return NextResponse.json(
-        { error: 'Missing required fields: element or response' },
-        { status: 400 }
-      );
-    }
-
     const API_ENDPOINTS = getApiConfig('versionRFP');
     const airtableEndpoint = API_ENDPOINTS.AIRTABLE.BASE_URL(
       API_ENDPOINTS.AIRTABLE.BASE_ID,
       API_ENDPOINTS.AIRTABLE.TABLE_NAME
     );
 
-    // Prepare the data for Airtable using the correct field names
-    const airtableData = {
-      fields: {
-        "rfp_element": body.element,
-        "rfp_response": body.response,
-      }
-    };
-
-    console.log("Sending to Airtable:", JSON.stringify(airtableData, null, 2));
-
     const airtableResponse = await fetch(airtableEndpoint, {
-      method: 'POST',
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(airtableData),
     });
 
     if (!airtableResponse.ok) {
       const errorData = await airtableResponse.json();
-      console.error("Airtable error details:", errorData);
       return NextResponse.json(
         { error: `Airtable error: ${errorData.error?.message || 'Unknown error'}` },
         { status: airtableResponse.status }
@@ -47,11 +26,22 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await airtableResponse.json();
+    console.log("First record from Airtable:", data.records.length > 0 ? data.records[0] : "No records");
+    
+    // Transform Airtable records to a more usable format using the correct field names
+    const transformedRecords = data.records.map((record: any) => ({
+      id: record.id,
+      question: '', // No question field in AirTable
+      element: record.fields.rfp_element || '',
+      response: record.fields.rfp_response || '',
+      createdTime: record.createdTime,
+      status: 'Pending' // No status field in AirTable
+    }));
+
     return NextResponse.json({ 
-      recordId: data.id,
+      records: transformedRecords,
       success: true 
     });
-    
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json(

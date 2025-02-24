@@ -33,7 +33,7 @@ export default function Home() {
     setIsParsingWithAI(true);
     
     try {
-      showNotification('info', `Sending question to Alltius...`, 8000);
+      showNotification('info', `Sending question to AskTacit...`, 8000);
       
       const response = await fetch(API_ENDPOINTS.INTERNAL.ANALYZE_RFP, {
         method: 'POST',
@@ -56,23 +56,23 @@ export default function Home() {
       setElements(data.elements);
       
       const newResponses: Record<number, string> = {};
-      data.elements.forEach((element, index) => {
+      data.elements.forEach((element: string, index: number) => {
         newResponses[index] = element;
       });
       setResponses(newResponses);
       
       // Initialize unsaved changes for new responses
       const newUnsavedChanges: Record<number, boolean> = {};
-      data.elements.forEach((_, index) => {
+      data.elements.forEach((_: string, index: number) => {
         newUnsavedChanges[index] = false;
       });
       setHasUnsavedChanges(newUnsavedChanges);
       
-      showNotification('success', `Received response from Alltius!`);
+      showNotification('success', `Received response from AskTacit!`);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error getting response:", err);
-      showNotification('error', `Failed to get response: ${err.message}`);
+      showNotification('error', `Failed to get response: ${err.message || 'Unknown error'}`);
     } finally {
       setIsParsingWithAI(false);
     }
@@ -87,6 +87,7 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          question: rfpTitle,
           element: elements[index],
           response: responses[index]
         }),
@@ -118,9 +119,9 @@ export default function Home() {
 
       showNotification('success', 'Response saved successfully!');
       
-    } catch (err) {
+    } catch (err: any) {
       console.error("Save error:", err);
-      showNotification('error', `Failed to save response: ${err.message}`);
+      showNotification('error', `Failed to save response: ${err.message || 'Unknown error'}`);
     } finally {
       setIsProcessing(prev => ({ ...prev, [index]: false }));
     }
@@ -143,6 +144,12 @@ export default function Home() {
               <span className="text-xl font-semibold text-gray-800">AskTacit</span>
             </Link>
             <h1 className="text-2xl font-bold text-gray-800">Engineering RFP Assistant</h1>
+            <Link 
+              href="/versionRFP/saved-responses" 
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all duration-200"
+            >
+              View Saved Responses
+            </Link>
           </div>
         </div>
       </header>
@@ -196,7 +203,7 @@ export default function Home() {
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100">
-                  {elements.map((item, index) => (
+                  {elements.map((item: string, index: number) => (
                     <li key={index} className="py-3 first:pt-0 last:pb-0">
                       <span className="font-medium text-gray-700">Response {index + 1}:</span>
                       <p className="mt-1 text-gray-600">{item}</p>
@@ -221,7 +228,7 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {elements.map((_, index) => (
+                  {elements.map((_: string, index: number) => (
                     <div key={index} className="bg-gray-50 rounded-lg p-4 transition-all duration-200 hover:shadow-md">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="text-sm font-medium text-gray-600">Response {index + 1}</h3>
