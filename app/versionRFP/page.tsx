@@ -8,7 +8,7 @@ import Link from "next/link";
 
 export default function Home() {
   const API_ENDPOINTS = getApiConfig('versionRFP');
-  const [rfpTitle, setRfpTitle] = useState("");
+  const [rfpTitle, setRfpTitle] = useState<string>("");
   const [elements, setElements] = useState<string[]>([]);
   const [responses, setResponses] = useState<Record<number, string>>({});
   const [isParsingWithAI, setIsParsingWithAI] = useState<boolean>(false);
@@ -71,9 +71,10 @@ export default function Home() {
       
       showNotification('success', `Received response from AskTacit!`);
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error getting response:", err);
-      showNotification('error', `Failed to get response: ${err.message || 'Unknown error'}`);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      showNotification('error', `Failed to get response: ${errorMessage}`);
     } finally {
       setIsParsingWithAI(false);
     }
@@ -120,9 +121,10 @@ export default function Home() {
 
       showNotification('success', 'Response saved successfully!');
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Save error:", err);
-      showNotification('error', `Failed to save response: ${err.message || 'Unknown error'}`);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      showNotification('error', `Failed to save response: ${errorMessage}`);
     } finally {
       setIsProcessing(prev => ({ ...prev, [index]: false }));
     }
@@ -155,20 +157,21 @@ export default function Home() {
       // Let user know they can print from there
       showNotification('success', 'Document opened in new tab. Use your browser\'s print function to save as PDF.');
       
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Export error:", err);
-      showNotification('error', `Failed to export document: ${err.message || 'Unknown error'}`);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      showNotification('error', `Failed to export document: ${errorMessage}`);
     } finally {
       setIsExportingPdf(false);
     }
   };
   
   // Generate a printable HTML document
-  const generateSimpleHtml = (rfpTitle, elements, responses) => {
+  const generateSimpleHtml = (rfpTitle: string, elements: string[], responses: Record<number, string>) => {
     const currentDate = new Date().toLocaleDateString();
     
     // Escape HTML and convert newlines to <br> tags
-    const escapeHtml = (text) => {
+    const escapeHtml = (text: string) => {
       if (!text) return '';
       return text
         .replace(/&/g, '&amp;')
@@ -179,7 +182,7 @@ export default function Home() {
         .replace(/\n/g, '<br/>');
     };
     
-    const elementRows = elements.map((element, index) => {
+    const elementRows = elements.map((element: string, index: number) => {
       const responseText = responses[index] || 'No response provided';
       
       return `
@@ -316,7 +319,7 @@ export default function Home() {
             <div className="flex space-x-4">
               <Link 
                 href="/versionRFP/saved-responses" 
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all duration-200"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200"
               >
                 View Saved Responses
               </Link>
@@ -356,23 +359,23 @@ export default function Home() {
             <div className="flex gap-4">
               <input
                 type="text"
-                className="flex-1 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-300 focus:border-purple-300 transition-all duration-200"
+                className="flex-1 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-300 transition-all duration-200"
                 placeholder="Enter your question..."
                 value={rfpTitle}
                 onChange={(e) => setRfpTitle(e.target.value)}
               />
               <button
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg disabled:bg-gray-400 hover:bg-purple-700 transition-all duration-200 flex items-center justify-center min-w-[140px] shadow-sm hover:shadow"
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg disabled:bg-gray-400 hover:bg-blue-700 transition-all duration-200 flex items-center justify-center min-w-[140px] shadow-sm hover:shadow"
                 onClick={handleAnalyzeRFP}
                 disabled={isParsingWithAI || !rfpTitle.trim()}
               >
                 {isParsingWithAI ? (
                   <>
                     <LoadingSpinner size="small" color="#ffffff" />
-                    <span className="ml-2">Analyzing...</span>
+                    <span className="ml-2">Thinking...</span>
                   </>
                 ) : (
-                  "Analyze"
+                  "Submit"
                 )}
               </button>
             </div>
@@ -401,7 +404,7 @@ export default function Home() {
                 </div>
               ) : elements.length === 0 ? (
                 <div className="text-gray-500 py-8 text-center border-2 border-dashed border-gray-200 rounded-lg">
-                  No elements yet. Enter a question and click "Analyze" to get started.
+                  No elements yet. Enter a question and click "Submit" to get started.
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100">
@@ -442,7 +445,7 @@ export default function Home() {
                       </div>
                       
                       <textarea
-                        className="w-full p-3 border border-gray-200 rounded-lg mb-3 focus:ring-2 focus:ring-purple-300 focus:border-purple-300 transition-all duration-200 min-h-[120px] bg-white"
+                        className="w-full p-3 border border-gray-200 rounded-lg mb-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-300 transition-all duration-200 min-h-[120px] bg-white"
                         value={responses[index] ?? ""}
                         onChange={(e) => handleResponseChange(index, e.target.value)}
                       />
@@ -450,7 +453,7 @@ export default function Home() {
                       <div className="flex items-center justify-between">
                         <button
                           className={`text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow
-                            ${hasUnsavedChanges[index] ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}
+                            ${hasUnsavedChanges[index] ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-500 hover:bg-gray-600'}
                             ${isProcessing[index] ? 'opacity-75 cursor-not-allowed' : ''}`}
                           onClick={() => handleSaveResponse(index)}
                           disabled={isProcessing[index]}
@@ -473,7 +476,7 @@ export default function Home() {
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                               </svg>
-                              Save to AskTacit
+                              Save
                             </>
                           )}
                         </button>

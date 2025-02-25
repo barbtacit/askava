@@ -16,8 +16,8 @@ const VERSION_CONFIG: Record<VersionKey, VersionConfig> = {
     airtableTableName: 'RFPData'
   },
   versionCyber: {
-    altiusAssistantId: 'your-cybersecurity-assistant-id',
-    airtableBaseId: 'your-cyber-base-id',
+    altiusAssistantId: '65495257c7b0f50850ebcce2',
+    airtableBaseId: 'tblvbBcYJ3HEdm73u',
     airtableTableName: 'CyberData'
   }
 };
