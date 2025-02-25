@@ -16,6 +16,7 @@ export default function Home() {
   const [lastSaved, setLastSaved] = useState<Record<number, Date | null>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<Record<number, boolean>>({});
   const [showSaveSuccess, setShowSaveSuccess] = useState<Record<number, boolean>>({});
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
   const { showNotification } = useNotification();
 
   // Track unsaved changes
@@ -127,9 +128,175 @@ export default function Home() {
     }
   };
 
+  const handleExportToPdf = async () => {
+    if (elements.length === 0 || Object.keys(responses).length === 0) {
+      showNotification('warning', 'No content to export. Please generate a response first.');
+      return;
+    }
+
+    setIsExportingPdf(true);
+    
+    try {
+      console.log("Starting PDF export process...");
+      
+      // Create a simple HTML version that we'll open in a new tab
+      // This is a more reliable approach than trying to generate a PDF directly
+      const htmlContent = generateSimpleHtml(rfpTitle, elements, responses);
+      
+      // Open a new tab with the HTML content
+      const newTab = window.open('', '_blank');
+      if (!newTab) {
+        throw new Error('Unable to open a new tab. Please check your browser settings and allow popups.');
+      }
+      
+      newTab.document.write(htmlContent);
+      newTab.document.close();
+      
+      // Let user know they can print from there
+      showNotification('success', 'Document opened in new tab. Use your browser\'s print function to save as PDF.');
+      
+    } catch (err) {
+      console.error("Export error:", err);
+      showNotification('error', `Failed to export document: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+  
+  // Generate a printable HTML document
+  const generateSimpleHtml = (rfpTitle, elements, responses) => {
+    const currentDate = new Date().toLocaleDateString();
+    
+    // Escape HTML and convert newlines to <br> tags
+    const escapeHtml = (text) => {
+      if (!text) return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br/>');
+    };
+    
+    const elementRows = elements.map((element, index) => {
+      const responseText = responses[index] || 'No response provided';
+      
+      return `
+        <div class="response-section">
+          <h3>Element ${index + 1}</h3>
+          <div class="element-content">
+            <p>${escapeHtml(element)}</p>
+          </div>
+          <div class="response-content">
+            <h4>Response:</h4>
+            <p>${escapeHtml(responseText)}</p>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>RFP Response: ${escapeHtml(rfpTitle)}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 20px;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              padding-bottom: 10px;
+              border-bottom: 1px solid #ddd;
+            }
+            .title {
+              color: #5b21b6;
+              font-size: 24px;
+              margin-bottom: 5px;
+            }
+            .date {
+              color: #666;
+              font-size: 14px;
+            }
+            .response-section {
+              margin-bottom: 30px;
+              padding-bottom: 20px;
+              border-bottom: 1px solid #eee;
+            }
+            h3 {
+              color: #5b21b6;
+              margin-bottom: 10px;
+            }
+            h4 {
+              margin-top: 15px;
+              margin-bottom: 10px;
+              color: #666;
+            }
+            .element-content {
+              background-color: #f9f9f9;
+              padding: 15px;
+              border-radius: 5px;
+              margin-bottom: 15px;
+            }
+            .response-content {
+              padding: 0 15px;
+            }
+            p {
+              margin: 10px 0;
+            }
+            .footer {
+              margin-top: 40px;
+              text-align: center;
+              font-size: 12px;
+              color: #666;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              button {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">RFP Response: ${escapeHtml(rfpTitle)}</h1>
+            <p class="date">Generated on ${currentDate}</p>
+          </div>
+          
+          ${elementRows}
+          
+          <div class="footer">
+            <p>Generated by AskTacit RFP Assistant</p>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px; margin-bottom: 30px;">
+            <button onclick="window.print()" style="padding: 10px 20px; background-color: #5b21b6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+              Print / Save as PDF
+            </button>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+
+
   const formatLastSaved = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Check if we have unsaved changes anywhere
+  const hasAnyUnsavedChanges = Object.values(hasUnsavedChanges).some(value => value === true);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -146,12 +313,35 @@ export default function Home() {
               <span className="text-xl font-semibold text-gray-800">AskTacit</span>
             </Link>
             <h1 className="text-2xl font-bold text-gray-800">Engineering RFP Assistant</h1>
-            <Link 
-              href="/versionRFP/saved-responses" 
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all duration-200"
-            >
-              View Saved Responses
-            </Link>
+            <div className="flex space-x-4">
+              <Link 
+                href="/versionRFP/saved-responses" 
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all duration-200"
+              >
+                View Saved Responses
+              </Link>
+              {elements.length > 0 && (
+                <button 
+                  onClick={handleExportToPdf}
+                  disabled={isExportingPdf}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center"
+                >
+                  {isExportingPdf ? (
+                    <>
+                      <LoadingSpinner size="small" color="#ffffff" />
+                      <span className="ml-2">Preparing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export Document
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -188,6 +378,16 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Warning for unsaved changes */}
+        {hasAnyUnsavedChanges && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-700 flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>You have unsaved changes. Remember to save your responses before exporting or navigating away.</span>
+          </div>
+        )}
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
